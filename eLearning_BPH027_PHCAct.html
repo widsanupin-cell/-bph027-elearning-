@@ -1012,6 +1012,7 @@
 <!-- ฟอร์มที่ซ่อนไว้สำหรับส่งผลไป Google Forms เบื้องหลัง โดยไม่เปิดหน้าฟอร์มให้นักศึกษาเห็น/แก้ไขคะแนน -->
 <iframe name="hiddenFormFrame" id="hiddenFormFrame" style="display:none;" title="ส่งผลเบื้องหลัง"></iframe>
 <form id="silentGForm" method="POST" target="hiddenFormFrame" style="display:none;">
+  <input type="hidden" name="fvv" value="1">
   <input type="text" id="hf_name">
   <input type="text" id="hf_studentId">
   <input type="text" id="hf_checkpoint">
@@ -1507,12 +1508,12 @@ const FORM_EDIT_CODE = "BPH027-2569"; // รหัสสำหรับแก้
 
 // รหัสช่อง (entry ID) ของแต่ละคำถามใน Google Form — ได้จากลิงก์กรอกข้อมูลล่วงหน้าที่อาจารย์ส่งมา
 const FORM_ENTRY = {
-  name: "1162244248",       // entry ID ของช่อง "ชื่อ-สกุล"
-  studentId: "1487591097",  // entry ID ของช่อง "รหัสนักศึกษา"
-  checkpoint: "2143092657", // entry ID ของช่อง "คะแนนแบบทดสอบระหว่างเรียน"
-  final: "1232040320",      // entry ID ของช่อง "คะแนนแบบทดสอบสรุปท้ายบท"
-  total: "302250155",       // entry ID ของช่อง "คะแนนรวม"
-  time: "1977667514"        // entry ID ของช่อง "เวลาที่ใช้เรียน"
+  name: "1540216616",       // entry ID ของช่อง "ชื่อ-สกุล"
+  studentId: "808969938",   // entry ID ของช่อง "รหัสนักศึกษา"
+  checkpoint: "2140203565", // entry ID ของช่อง "คะแนนแบบทดสอบระหว่างเรียน"
+  final: "1831036031",      // entry ID ของช่อง "คะแนนแบบทดสอบสรุปท้ายบท"
+  total: "2021558314",      // entry ID ของช่อง "คะแนนรวม"
+  time: "243105799"         // entry ID ของช่อง "เวลาที่ใช้เรียน"
 };
 
 function currentScoreParts(){
