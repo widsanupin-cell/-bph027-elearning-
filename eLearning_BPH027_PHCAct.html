@@ -2343,13 +2343,16 @@ function renderQuiz(containerEl, key){
       btn.className = 'qopt';
       btn.textContent = optText;
       btn.addEventListener('click', () => {
-        if (answered) return;
-        answered = true;
-        totalAnswered++;
-
         const buttons = optsWrap.querySelectorAll('.qopt');
-        buttons.forEach((b) => { b.disabled = true; b.classList.add('dim'); });
-        btn.classList.remove('dim');
+
+        if (!answered) {
+          answered = true;
+          totalAnswered++;
+        } else if (ANSWER_STATE[key][idx] === true) {
+          totalCorrect--; // เปลี่ยนคำตอบ: หักคะแนนถูกเดิมออกก่อนนับใหม่
+        }
+
+        buttons.forEach((b) => { b.classList.remove('selected'); });
         btn.classList.add('selected');
 
         const isCorrect = (oi === item.correct);
@@ -2358,7 +2361,7 @@ function renderQuiz(containerEl, key){
 
         const fb = block.querySelector('.qfeedback');
         fb.classList.add('show');
-        fb.innerHTML = '<b>บันทึกคำตอบแล้ว</b>คำตอบของท่านถูกบันทึกไว้แล้ว ระบบจะไม่เฉลยคำตอบที่ถูกต้องระหว่างทำแบบทดสอบ — ผลคะแนนโดยรวมจะแสดงเมื่อทำครบทุกข้อของตอนนี้';
+        fb.innerHTML = '<b>บันทึกคำตอบแล้ว</b>คำตอบของท่านถูกบันทึกไว้แล้ว (เลือกข้อใหม่ได้หากต้องการเปลี่ยนคำตอบ) ระบบจะไม่เฉลยคำตอบที่ถูกต้องระหว่างทำแบบทดสอบ — ผลคะแนนโดยรวมจะแสดงเมื่อทำครบทุกข้อของตอนนี้';
 
         updateQuizScore(key);
         updateGlobalScore();
@@ -2749,7 +2752,8 @@ const FORM_ENTRY = {
   checkpoint: "2140203565", // entry ID ของช่อง "คะแนนแบบทดสอบระหว่างเรียน"
   final: "1831036031",      // entry ID ของช่อง "คะแนนแบบทดสอบสรุปท้ายบท"
   total: "2021558314",      // entry ID ของช่อง "คะแนนรวม"
-  time: "243105799"         // entry ID ของช่อง "เวลาที่ใช้เรียน"
+  time: "243105799",        // entry ID ของช่อง "เวลาที่ใช้เรียน"
+  week: "1461340763"        // entry ID ของช่อง "สัปดาห์ที่"
 };
 
 function currentScoreParts(){
@@ -2784,6 +2788,7 @@ function buildPrefillUrl(){
   params.set('entry.' + FORM_ENTRY.final, p.finalText);
   params.set('entry.' + FORM_ENTRY.total, p.totalText);
   params.set('entry.' + FORM_ENTRY.time, p.elapsed);
+  if (FORM_ENTRY.week) params.set('entry.' + FORM_ENTRY.week, '3');
   return base + '?' + params.toString();
 }
 
@@ -2824,6 +2829,77 @@ document.getElementById('formSaveLink').addEventListener('click', () => {
   document.getElementById('formEditPanel').classList.remove('show');
   alert('บันทึกลิงก์ใหม่แล้ว (มีผลจนกว่าจะปิดหน้านี้ — หากต้องการให้ถาวร ให้แก้ค่า FORM_DEFAULT_LINK ในไฟล์ HTML โดยตรง)');
 });
+
+/* ============ ส่งผลการเรียนรายสัปดาห์ (สัปดาห์อื่นนอกจากสัปดาห์ที่ 3) ============ */
+const WEEK_SUBMIT_CONFIG = [
+  { week:'1',  finalSectionId:'w1final',  checkpointKeys:['quizW1_1','quizW1_2','quizW1_3'],   finalKey:'quizW1Final',  finalMax:10 },
+  { week:'2',  finalSectionId:'w2final',  checkpointKeys:['quizW2_1','quizW2_2','quizW2_3'],   finalKey:'quizW2Final',  finalMax:10 },
+  { week:'4',  finalSectionId:'w4final',  checkpointKeys:['quizW4_1','quizW4_2','quizW4_3'],   finalKey:'quizW4Final',  finalMax:10 },
+  { week:'5',  finalSectionId:'w5final',  checkpointKeys:['quizW5_1','quizW5_2','quizW5_3'],   finalKey:'quizW5Final',  finalMax:10 },
+  { week:'6',  finalSectionId:'w6final',  checkpointKeys:['quizW6_1','quizW6_2','quizW6_3'],   finalKey:'quizW6Final',  finalMax:10 },
+  { week:'7',  finalSectionId:'w7',       checkpointKeys:[],                                    finalKey:'quizMidterm',  finalMax:20 },
+  { week:'8',  finalSectionId:'w8final',  checkpointKeys:['quizW8_1','quizW8_2','quizW8_3'],   finalKey:'quizW8Final',  finalMax:10 },
+  { week:'9',  finalSectionId:'w9final',  checkpointKeys:['quizW9_1','quizW9_2','quizW9_3'],   finalKey:'quizW9Final',  finalMax:10 },
+  { week:'10', finalSectionId:'w10final', checkpointKeys:['quizW10_1','quizW10_2','quizW10_3'],finalKey:'quizW10Final', finalMax:10 },
+  { week:'11', finalSectionId:'w11final', checkpointKeys:['quizW11_1','quizW11_2','quizW11_3'],finalKey:'quizW11Final', finalMax:10 },
+  { week:'12', finalSectionId:'w12',      checkpointKeys:[],                                    finalKey:'quizFinalExam',finalMax:25 }
+];
+
+function buildWeekPrefillUrl(weekLabel, checkpointText, finalText, totalText, elapsed){
+  const base = FORM_DEFAULT_LINK.split('?')[0];
+  const params = new URLSearchParams();
+  params.set('usp', 'pp_url');
+  params.set('entry.' + FORM_ENTRY.name, LEARNER_NAME);
+  params.set('entry.' + FORM_ENTRY.studentId, LEARNER_ID);
+  params.set('entry.' + FORM_ENTRY.checkpoint, checkpointText);
+  params.set('entry.' + FORM_ENTRY.final, finalText);
+  params.set('entry.' + FORM_ENTRY.total, totalText);
+  params.set('entry.' + FORM_ENTRY.time, elapsed);
+  params.set('entry.' + FORM_ENTRY.week, weekLabel);
+  return base + '?' + params.toString();
+}
+
+function injectWeekSubmitBox(cfg){
+  const section = document.getElementById(cfg.finalSectionId);
+  if (!section || !FORM_ENTRY.week) return;
+
+  const box = document.createElement('div');
+  box.className = 'reg-box confirm-box';
+  box.style.marginTop = '20px';
+  box.innerHTML =
+    '<h3>ส่งผลการเรียนสัปดาห์ที่ ' + cfg.week + ' ให้อาจารย์</h3>' +
+    '<p class="reg-note">บทเรียนหน้านี้ใช้สำหรับ<b>ฝึกทำและทบทวนความเข้าใจ</b>เท่านั้น คะแนนที่ขึ้นในหน้านี้จะหายไปเมื่อปิดหรือรีเฟรชหน้าเว็บ — กดปุ่มด้านล่างเพื่อเปิดแบบฟอร์มที่กรอกชื่อ รหัสนักศึกษา สัปดาห์ และคะแนนของท่านไว้ให้ครบทุกช่องแล้วโดยอัตโนมัติ <b>ไม่ต้องพิมพ์หรือแก้ไขคะแนนเอง</b> เพียงตรวจสอบแล้วกดปุ่ม &ldquo;ส่ง&rdquo; อีกครั้งในหน้าฟอร์มเพื่อยืนยันการบันทึกผล</p>' +
+    '<div class="reg-actions"><a href="#" class="reg-save wk-submit-link" style="display:inline-flex;align-items:center;text-decoration:none;" target="_blank" rel="noopener">เปิดแบบฟอร์มเพื่อส่งผล (กรอกให้ครบแล้ว)</a></div>';
+
+  section.appendChild(box);
+
+  box.querySelector('.wk-submit-link').addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!isQuizFullyAnswered(cfg.finalKey)) {
+      alert('กรุณาทำแบบทดสอบให้ครบทุกข้อก่อนส่งผล');
+      return;
+    }
+    if (!LEARNER_NAME || !LEARNER_ID) {
+      alert('ไม่พบชื่อ-รหัสนักศึกษา กรุณาเข้าสู่บทเรียนใหม่อีกครั้ง');
+      return;
+    }
+    let checkpointCorrect = 0, checkpointTotal = 0;
+    cfg.checkpointKeys.forEach(k => {
+      checkpointCorrect += quizCorrectCount(k);
+      checkpointTotal += QUIZZES[k].length;
+    });
+    const finalCorrect = quizCorrectCount(cfg.finalKey);
+    const checkpointText = cfg.checkpointKeys.length ? (checkpointCorrect + '/' + checkpointTotal) : '-';
+    const finalText = finalCorrect + '/' + cfg.finalMax;
+    const totalText = (checkpointCorrect + finalCorrect) + '/' + (checkpointTotal + cfg.finalMax);
+    const elapsed = document.getElementById('elapsed').textContent;
+
+    const url = buildWeekPrefillUrl(cfg.week, checkpointText, finalText, totalText, elapsed);
+    window.open(url, '_blank', 'noopener');
+  });
+}
+
+WEEK_SUBMIT_CONFIG.forEach(injectWeekSubmitBox);
 </script>
 </body>
 </html>
