@@ -2601,7 +2601,9 @@ async function loadWeekAccessFromSheet(){
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
+    console.log('[DEBUG] CSV ดิบที่ได้จากชีต (300 ตัวอักษรแรก):', text.slice(0, 300));
     const rows = text.trim().split(/\r?\n/).map(r => r.split(',').map(c => c.trim().replace(/^"|"$/g,'').replace(/\r/g,'')));
+    console.log('[DEBUG] จำนวนแถวที่แยกได้:', rows.length, rows.slice(0,3));
     rows.slice(1).forEach(row => {
       const weekKey = 'w' + (row[0] || '').trim().replace(/\r/g,'');
       const status = (row[1] || '').trim().replace(/\r/g,'');
@@ -2609,6 +2611,7 @@ async function loadWeekAccessFromSheet(){
         WEEK_ACCESS[weekKey] = (status === 'เปิด' || status.toLowerCase() === 'open');
       }
     });
+    console.log('[DEBUG] WEEK_ACCESS หลังประมวลผล:', JSON.stringify(WEEK_ACCESS));
   } catch (e) {
     console.warn('โหลดสถานะเปิด-ปิดจาก Google Sheet ไม่สำเร็จ ใช้ค่าเริ่มต้นแทน', e);
   }
