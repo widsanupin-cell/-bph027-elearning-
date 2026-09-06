@@ -1093,14 +1093,10 @@
 
         <div class="reg-box confirm-box gated" id="confirmBox">
           <h3>ส่งผลการเรียนให้อาจารย์</h3>
-          <p class="reg-note">บทเรียนหน้านี้ใช้สำหรับ<b>ฝึกทำและทบทวนความเข้าใจ</b>เท่านั้น คะแนนที่ขึ้นในหน้านี้จะหายไปเมื่อปิดหรือรีเฟรชหน้าเว็บ — กดปุ่มด้านล่างเพื่อเปิดแบบฟอร์มที่กรอกชื่อ รหัสนักศึกษา และคะแนนของท่านไว้ให้ครบทุกช่องแล้วโดยอัตโนมัติ <b>ไม่ต้องพิมพ์หรือแก้ไขคะแนนเอง</b> เพียงตรวจสอบแล้วกดปุ่ม &ldquo;ส่ง&rdquo; อีกครั้งในหน้าฟอร์มเพื่อยืนยันการบันทึกผล</p>
+          <p class="reg-note">บทเรียนหน้านี้ใช้สำหรับ<b>ฝึกทำและทบทวนความเข้าใจ</b>เท่านั้น คะแนนที่ขึ้นในหน้านี้จะหายไปเมื่อปิดหรือรีเฟรชหน้าเว็บ — กดปุ่มด้านล่างเพื่อส่งชื่อ รหัสนักศึกษา และคะแนนของท่านไปบันทึกที่ระบบของอาจารย์โดยตรง <b>ไม่มีหน้าจอให้แก้ไขคะแนนได้</b></p>
           <div class="reg-actions">
-            <a href="#" id="formLink" class="reg-save" style="display:inline-flex;align-items:center;text-decoration:none;" target="_blank" rel="noopener">เปิดแบบฟอร์มเพื่อส่งผล (กรอกให้ครบแล้ว)</a>
-          </div>
-          <button class="gc-edit-toggle" id="formEditToggle">แก้ไขลิงก์ Google Form (สำหรับอาจารย์ผู้สอนเท่านั้น — ต้องใส่รหัส)</button>
-          <div class="gc-edit-panel" id="formEditPanel">
-            <input type="text" id="formNewLink" placeholder="วางลิงก์ Google Form ที่นี่ เช่น https://forms.gle/XXXXXXXX">
-            <button id="formSaveLink">บันทึกลิงก์</button>
+            <button id="submitScoreBtn" class="reg-save">ส่งผลการเรียนให้อาจารย์</button>
+            <span class="reg-status" id="submitScoreStatus"></span>
           </div>
         </div>
       </section>
@@ -2742,8 +2738,9 @@ document.getElementById('gcSaveLink').addEventListener('click', () => {
 
 /* ============ GOOGLE FORM — ยืนยันผลการเรียน (passcode-protected edit) ============ */
 // ผู้สอนสามารถตั้งลิงก์ Google Form เริ่มต้นและรหัสแก้ไขได้ที่นี่โดยตรงในไฟล์:
-const FORM_DEFAULT_LINK = "https://docs.google.com/forms/d/e/1FAIpQLSeaA8VjzI44ntICbbUhJg5XYZuBnWd4AkGEzmDL6wLn6lfEZA/viewform"; // ลิงก์กรอกฟอร์มยืนยันผลการเรียน (ลิงก์ที่เผยแพร่แล้ว)
+const FORM_DEFAULT_LINK = "https://docs.google.com/forms/d/e/1FAIpQLSeaA8VjzI44ntICbbUhJg5XYZuBnWd4AkGEzmDL6wLn6lfEZA/viewform"; // ลิงก์กรอกฟอร์มยืนยันผลการเรียน (ลิงก์ที่เผยแพร่แล้ว) — เก็บไว้อ้างอิง ไม่ได้ใช้เปิดให้นักศึกษาเห็นอีกต่อไป
 const FORM_EDIT_CODE = "BPH027-2569"; // รหัสสำหรับแก้ไขลิงก์ Form — ใช้รหัสเดียวกับ Classroom เพื่อให้จำง่าย เปลี่ยนได้ตามต้องการ
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzM9t3vOsX09fbx2PCuCnybCn5F_csL02NptTVhjOYkDKGF8Y4KU1fDclohOL4GXGT5Ag/exec"; // Web App ที่รับคะแนนแล้วบันทึกตรงเข้าชีต ไม่มีหน้าจอให้แก้ไข
 
 // รหัสช่อง (entry ID) ของแต่ละคำถามใน Google Form — ได้จากลิงก์กรอกข้อมูลล่วงหน้าที่อาจารย์ส่งมา
 const FORM_ENTRY = {
@@ -2775,62 +2772,42 @@ function currentScoreParts(){
   };
 }
 
-function buildPrefillUrl(){
-  const hasAllEntries = FORM_ENTRY.name && FORM_ENTRY.studentId && FORM_ENTRY.checkpoint && FORM_ENTRY.final && FORM_ENTRY.total && FORM_ENTRY.time;
-  if (!hasAllEntries) return null; // ยังไม่ได้ตั้งค่า entry ID ครบ — ใช้ทางสำรอง (วางข้อความเอง)
-  const p = currentScoreParts();
-  const base = FORM_DEFAULT_LINK.split('?')[0];
-  const params = new URLSearchParams();
-  params.set('usp', 'pp_url');
-  params.set('entry.' + FORM_ENTRY.name, p.name);
-  params.set('entry.' + FORM_ENTRY.studentId, p.id);
-  params.set('entry.' + FORM_ENTRY.checkpoint, p.checkpointText);
-  params.set('entry.' + FORM_ENTRY.final, p.finalText);
-  params.set('entry.' + FORM_ENTRY.total, p.totalText);
-  params.set('entry.' + FORM_ENTRY.time, p.elapsed);
-  if (FORM_ENTRY.week) params.set('entry.' + FORM_ENTRY.week, '3');
-  return base + '?' + params.toString();
-}
-
-const formLink = document.getElementById('formLink');
-if (FORM_DEFAULT_LINK) {
-  formLink.href = FORM_DEFAULT_LINK;
-} else {
-  formLink.href = '#';
-  formLink.textContent = 'ยังไม่ได้ตั้งลิงก์ Google Form ↗';
-}
-
-formLink.addEventListener('click', (e) => {
-  const prefilled = buildPrefillUrl();
-  if (prefilled) {
-    e.preventDefault();
-    window.open(prefilled, '_blank', 'noopener');
-  }
-  // ถ้ายังไม่ได้ตั้ง entry ID ครบ ปล่อยให้ลิงก์เปิดฟอร์มเปล่าตามปกติ (ใช้คู่กับปุ่มคัดลอกสรุปผล)
-});
-
-document.getElementById('formEditToggle').addEventListener('click', () => {
-  const code = prompt('กรุณาใส่รหัสสำหรับแก้ไขลิงก์ Google Form (อาจารย์ผู้สอนเท่านั้น):');
-  if (code === null) return;
-  if (code !== FORM_EDIT_CODE) {
-    alert('รหัสไม่ถูกต้อง ไม่สามารถแก้ไขลิงก์ได้');
+/* ============ ส่งผลการเรียนไปยัง Apps Script โดยตรง (นักศึกษาไม่เห็น/แก้ไขคะแนนได้เลย) ============ */
+function submitScoreToSheet(week, checkpointText, finalText, totalText, elapsed, btn, statusEl){
+  if (!LEARNER_NAME || !LEARNER_ID) {
+    alert('ไม่พบชื่อ-รหัสนักศึกษา กรุณาเข้าสู่บทเรียนใหม่อีกครั้ง');
     return;
   }
-  const panel = document.getElementById('formEditPanel');
-  panel.classList.add('show');
-  document.getElementById('formNewLink').value = (formLink.getAttribute('href') === '#') ? '' : formLink.getAttribute('href');
+  const params = new URLSearchParams();
+  params.set('name', LEARNER_NAME);
+  params.set('studentId', LEARNER_ID);
+  params.set('checkpoint', checkpointText);
+  params.set('final', finalText);
+  params.set('total', totalText);
+  params.set('time', elapsed);
+  params.set('week', week);
+
+  btn.disabled = true;
+  statusEl.textContent = 'กำลังส่งผล...';
+
+  fetch(APPS_SCRIPT_URL + '?' + params.toString(), { method: 'GET', mode: 'no-cors' })
+    .then(() => {
+      statusEl.textContent = 'ส่งผลการเรียนเรียบร้อยแล้ว ✓ (ท่านสามารถปิดหน้านี้ได้เลย)';
+    })
+    .catch(() => {
+      statusEl.textContent = 'ส่งผลไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่';
+      btn.disabled = false;
+    });
+}
+
+// สัปดาห์ที่ 3
+document.getElementById('submitScoreBtn').addEventListener('click', () => {
+  const p = currentScoreParts();
+  submitScoreToSheet('3', p.checkpointText, p.finalText, p.totalText, p.elapsed,
+    document.getElementById('submitScoreBtn'), document.getElementById('submitScoreStatus'));
 });
 
-document.getElementById('formSaveLink').addEventListener('click', () => {
-  const val = document.getElementById('formNewLink').value.trim();
-  if (!val) return;
-  formLink.href = val;
-  formLink.textContent = 'เปิด Google Form ยืนยันผล ↗';
-  document.getElementById('formEditPanel').classList.remove('show');
-  alert('บันทึกลิงก์ใหม่แล้ว (มีผลจนกว่าจะปิดหน้านี้ — หากต้องการให้ถาวร ให้แก้ค่า FORM_DEFAULT_LINK ในไฟล์ HTML โดยตรง)');
-});
-
-/* ============ ส่งผลการเรียนรายสัปดาห์ (สัปดาห์อื่นนอกจากสัปดาห์ที่ 3) ============ */
+// สัปดาห์อื่น ๆ ทั้งหมด
 const WEEK_SUBMIT_CONFIG = [
   { week:'1',  finalSectionId:'w1final',  checkpointKeys:['quizW1_1','quizW1_2','quizW1_3'],   finalKey:'quizW1Final',  finalMax:10 },
   { week:'2',  finalSectionId:'w2final',  checkpointKeys:['quizW2_1','quizW2_2','quizW2_3'],   finalKey:'quizW2Final',  finalMax:10 },
@@ -2845,42 +2822,26 @@ const WEEK_SUBMIT_CONFIG = [
   { week:'12', finalSectionId:'w12',      checkpointKeys:[],                                    finalKey:'quizFinalExam',finalMax:25 }
 ];
 
-function buildWeekPrefillUrl(weekLabel, checkpointText, finalText, totalText, elapsed){
-  const base = FORM_DEFAULT_LINK.split('?')[0];
-  const params = new URLSearchParams();
-  params.set('usp', 'pp_url');
-  params.set('entry.' + FORM_ENTRY.name, LEARNER_NAME);
-  params.set('entry.' + FORM_ENTRY.studentId, LEARNER_ID);
-  params.set('entry.' + FORM_ENTRY.checkpoint, checkpointText);
-  params.set('entry.' + FORM_ENTRY.final, finalText);
-  params.set('entry.' + FORM_ENTRY.total, totalText);
-  params.set('entry.' + FORM_ENTRY.time, elapsed);
-  params.set('entry.' + FORM_ENTRY.week, weekLabel);
-  return base + '?' + params.toString();
-}
-
 function injectWeekSubmitBox(cfg){
   const section = document.getElementById(cfg.finalSectionId);
-  if (!section || !FORM_ENTRY.week) return;
+  if (!section) return;
 
   const box = document.createElement('div');
   box.className = 'reg-box confirm-box';
   box.style.marginTop = '20px';
   box.innerHTML =
     '<h3>ส่งผลการเรียนสัปดาห์ที่ ' + cfg.week + ' ให้อาจารย์</h3>' +
-    '<p class="reg-note">บทเรียนหน้านี้ใช้สำหรับ<b>ฝึกทำและทบทวนความเข้าใจ</b>เท่านั้น คะแนนที่ขึ้นในหน้านี้จะหายไปเมื่อปิดหรือรีเฟรชหน้าเว็บ — กดปุ่มด้านล่างเพื่อเปิดแบบฟอร์มที่กรอกชื่อ รหัสนักศึกษา สัปดาห์ และคะแนนของท่านไว้ให้ครบทุกช่องแล้วโดยอัตโนมัติ <b>ไม่ต้องพิมพ์หรือแก้ไขคะแนนเอง</b> เพียงตรวจสอบแล้วกดปุ่ม &ldquo;ส่ง&rdquo; อีกครั้งในหน้าฟอร์มเพื่อยืนยันการบันทึกผล</p>' +
-    '<div class="reg-actions"><a href="#" class="reg-save wk-submit-link" style="display:inline-flex;align-items:center;text-decoration:none;" target="_blank" rel="noopener">เปิดแบบฟอร์มเพื่อส่งผล (กรอกให้ครบแล้ว)</a></div>';
+    '<p class="reg-note">บทเรียนหน้านี้ใช้สำหรับ<b>ฝึกทำและทบทวนความเข้าใจ</b>เท่านั้น คะแนนที่ขึ้นในหน้านี้จะหายไปเมื่อปิดหรือรีเฟรชหน้าเว็บ — กดปุ่มด้านล่างเพื่อส่งชื่อ รหัสนักศึกษา และคะแนนของท่านไปบันทึกที่ระบบของอาจารย์โดยตรง <b>ไม่มีหน้าจอให้แก้ไขคะแนนได้</b></p>' +
+    '<div class="reg-actions"><button class="reg-save wk-submit-btn">ส่งผลการเรียนให้อาจารย์</button><span class="reg-status wk-submit-status"></span></div>';
 
   section.appendChild(box);
 
-  box.querySelector('.wk-submit-link').addEventListener('click', (e) => {
-    e.preventDefault();
+  const btn = box.querySelector('.wk-submit-btn');
+  const statusEl = box.querySelector('.wk-submit-status');
+
+  btn.addEventListener('click', () => {
     if (!isQuizFullyAnswered(cfg.finalKey)) {
       alert('กรุณาทำแบบทดสอบให้ครบทุกข้อก่อนส่งผล');
-      return;
-    }
-    if (!LEARNER_NAME || !LEARNER_ID) {
-      alert('ไม่พบชื่อ-รหัสนักศึกษา กรุณาเข้าสู่บทเรียนใหม่อีกครั้ง');
       return;
     }
     let checkpointCorrect = 0, checkpointTotal = 0;
@@ -2894,8 +2855,7 @@ function injectWeekSubmitBox(cfg){
     const totalText = (checkpointCorrect + finalCorrect) + '/' + (checkpointTotal + cfg.finalMax);
     const elapsed = document.getElementById('elapsed').textContent;
 
-    const url = buildWeekPrefillUrl(cfg.week, checkpointText, finalText, totalText, elapsed);
-    window.open(url, '_blank', 'noopener');
+    submitScoreToSheet(cfg.week, checkpointText, finalText, totalText, elapsed, btn, statusEl);
   });
 }
 
