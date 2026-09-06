@@ -2601,10 +2601,10 @@ async function loadWeekAccessFromSheet(){
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
-    const rows = text.trim().split('\n').map(r => r.split(',').map(c => c.trim().replace(/^"|"$/g,'')));
+    const rows = text.trim().split(/\r?\n/).map(r => r.split(',').map(c => c.trim().replace(/^"|"$/g,'').replace(/\r/g,'')));
     rows.slice(1).forEach(row => {
-      const weekKey = 'w' + (row[0] || '').trim();
-      const status = (row[1] || '').trim();
+      const weekKey = 'w' + (row[0] || '').trim().replace(/\r/g,'');
+      const status = (row[1] || '').trim().replace(/\r/g,'');
       if (Object.prototype.hasOwnProperty.call(WEEK_ACCESS, weekKey)) {
         WEEK_ACCESS[weekKey] = (status === 'เปิด' || status.toLowerCase() === 'open');
       }
