@@ -305,7 +305,9 @@
     position:fixed; inset:0; z-index:9998;
     background:var(--paper); overflow-y:auto;
     padding:40px 20px 60px; margin:0; border-radius:0;
+    filter:none !important; pointer-events:auto !important;
   }
+  .quiz.exam-locked *{filter:none !important; pointer-events:auto !important; opacity:1 !important; user-select:auto !important;}
   .quiz.exam-locked .quiz-head,
   .quiz.exam-locked .qcontainer,
   .quiz.exam-locked .exam-result-box{
