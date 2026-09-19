@@ -496,6 +496,55 @@
     .news-hook{margin:-24px 20px 0;}
     .content{padding:40px 18px 100px;}
   }
+
+  /* ============ เช็คชื่อเข้าเรียน (checkin widget) ============ */
+  #checkinOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 99999;
+    align-items: center;
+    justify-content: center;
+  }
+  #checkinOverlay.active { display: flex; }
+  #checkinCard {
+    background: #fff;
+    border-radius: 14px;
+    padding: 28px 32px;
+    max-width: 360px;
+    width: 90%;
+    text-align: center;
+    font-family: 'TH Sarabun New', sans-serif;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+  #checkinCard h3 { margin: 0 0 12px; font-size: 22px; color: #1a1a1a; }
+  #checkinCard p { font-size: 18px; color: #444; margin: 8px 0; }
+  #checkinStatus { min-height: 24px; font-size: 16px; margin-top: 10px; }
+  #checkinStatus.ok { color: #1a7f37; }
+  #checkinStatus.err { color: #b42318; }
+  #checkinCard button {
+    margin-top: 16px;
+    padding: 10px 28px;
+    font-size: 17px;
+    border: none;
+    border-radius: 8px;
+    background: #2563eb;
+    color: #fff;
+    cursor: pointer;
+  }
+  #checkinCard button:disabled { background: #93c5fd; cursor: not-allowed; }
+  .checkin-spinner {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid #ccc;
+    border-top-color: #2563eb;
+    border-radius: 50%;
+    animation: checkin-spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes checkin-spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body class="gate-open">
@@ -2964,12 +3013,77 @@ function injectWeekSubmitBox(cfg){
   quizEl.style.display = 'none';
 
   startGateWrap.querySelector('.exam-start-btn').addEventListener('click', () => {
-    startGateWrap.style.display = 'none';
-    quizEl.style.display = '';
-    quizEl.classList.add('exam-locked');
-    document.documentElement.classList.add('exam-lock-active');
-    quizEl.scrollTop = 0;
+    // เช็คชื่อเข้าเรียนก่อนเริ่มทำแบบทดสอบ (ไม่บล็อกการเรียนถ้าระบบเช็คชื่อขัดข้อง)
+    showCheckinGate(LEARNER_NAME, LEARNER_ID, () => {
+      startGateWrap.style.display = 'none';
+      quizEl.style.display = '';
+      quizEl.classList.add('exam-locked');
+      document.documentElement.classList.add('exam-lock-active');
+      quizEl.scrollTop = 0;
+    });
   });
+}
+
+/* ============ เช็คชื่อเข้าเรียน (checkin widget) ============ */
+// URL Web App ของระบบเช็คชื่อ (deploy จาก CheckinScript.gs บนชีท "ภาพรวมการสอน BPHO27...")
+const CHECKIN_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyA0-Mx0u6s2oVGWBg5aT8Q72O61GYWf3qp8fDZc9G8dyKtqlz6QHx0V0EPCiAPx3amxw/exec';
+
+const checkinOverlayEl = document.createElement('div');
+checkinOverlayEl.id = 'checkinOverlay';
+checkinOverlayEl.innerHTML =
+  '<div id="checkinCard">' +
+    '<h3>📋 เช็คชื่อเข้าเรียน</h3>' +
+    '<p id="checkinNameLine"></p>' +
+    '<div id="checkinStatus"><span class="checkin-spinner"></span>กำลังเช็คชื่อ...</div>' +
+    '<button id="checkinContinueBtn" style="display:none;">เริ่มทำแบบทดสอบ</button>' +
+  '</div>';
+document.body.appendChild(checkinOverlayEl);
+
+/**
+ * เรียกใช้ก่อนเริ่มแบบทดสอบประจำสัปดาห์ — เช็คชื่อกับระบบ แล้วค่อยเรียก onDone
+ * ถ้าระบบเช็คชื่อขัดข้อง จะไม่บล็อกไม่ให้นักศึกษาเรียนต่อ (แจ้งเตือนแล้วปล่อยผ่าน)
+ */
+function showCheckinGate(name, studentId, onDone){
+  const overlay = document.getElementById('checkinOverlay');
+  const statusEl = document.getElementById('checkinStatus');
+  const nameLine = document.getElementById('checkinNameLine');
+  const btn = document.getElementById('checkinContinueBtn');
+
+  nameLine.textContent = (name || '') + ' (' + (studentId || '') + ')';
+  statusEl.className = '';
+  statusEl.innerHTML = '<span class="checkin-spinner"></span>กำลังเช็คชื่อ...';
+  btn.style.display = 'none';
+  overlay.classList.add('active');
+
+  const finish = function(){
+    overlay.classList.remove('active');
+    if (typeof onDone === 'function') onDone();
+  };
+  btn.onclick = finish;
+
+  const url = CHECKIN_SCRIPT_URL
+    + '?studentId=' + encodeURIComponent(studentId || '')
+    + '&name=' + encodeURIComponent(name || '');
+
+  fetch(url)
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if (data.success) {
+        statusEl.className = 'ok';
+        statusEl.textContent = data.alreadyChecked
+          ? '✓ ' + data.message
+          : '✓ เช็คชื่อสำเร็จ (สัปดาห์ที่ ' + data.week + ')';
+      } else {
+        statusEl.className = 'err';
+        statusEl.textContent = '⚠ ' + data.message;
+      }
+      btn.style.display = 'inline-block';
+    })
+    .catch(function(){
+      statusEl.className = 'err';
+      statusEl.textContent = '⚠ เช็คชื่อไม่สำเร็จ (เชื่อมต่อไม่ได้) แต่สามารถเรียนต่อได้';
+      btn.style.display = 'inline-block';
+    });
 }
 
 WEEK_SUBMIT_CONFIG.forEach(injectWeekSubmitBox);
