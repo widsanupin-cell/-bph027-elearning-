@@ -2802,10 +2802,13 @@ async function submitGate(){
   const readout = document.getElementById('regReadout');
   if (readout) readout.textContent = 'ชื่อ-สกุล: ' + name + '   |   รหัสนักศึกษา: ' + id;
 
-  document.getElementById('gateOverlay').classList.add('gate-closed');
-  document.body.classList.remove('gate-open');
-  setTimeout(() => { document.getElementById('gateOverlay').style.display = 'none'; }, 400);
-  startTime = Date.now();
+  // เช็คชื่อเข้าเรียนทันทีที่ล็อกอินสำเร็จ (ก่อนเริ่มเรียนเนื้อหา)
+  showCheckinGate(name, id, () => {
+    document.getElementById('gateOverlay').classList.add('gate-closed');
+    document.body.classList.remove('gate-open');
+    setTimeout(() => { document.getElementById('gateOverlay').style.display = 'none'; }, 400);
+    startTime = Date.now();
+  });
 
   // ส่งสัญญาณ "ยังใช้งานอยู่" ทุก 90 วินาที เพื่อรักษาสถานะเซสชันไว้ ป้องกันเครื่องอื่นแย่งเข้าใช้
   HEARTBEAT_TIMER = setInterval(() => {
@@ -3013,14 +3016,11 @@ function injectWeekSubmitBox(cfg){
   quizEl.style.display = 'none';
 
   startGateWrap.querySelector('.exam-start-btn').addEventListener('click', () => {
-    // เช็คชื่อเข้าเรียนก่อนเริ่มทำแบบทดสอบ (ไม่บล็อกการเรียนถ้าระบบเช็คชื่อขัดข้อง)
-    showCheckinGate(LEARNER_NAME, LEARNER_ID, () => {
-      startGateWrap.style.display = 'none';
-      quizEl.style.display = '';
-      quizEl.classList.add('exam-locked');
-      document.documentElement.classList.add('exam-lock-active');
-      quizEl.scrollTop = 0;
-    });
+    startGateWrap.style.display = 'none';
+    quizEl.style.display = '';
+    quizEl.classList.add('exam-locked');
+    document.documentElement.classList.add('exam-lock-active');
+    quizEl.scrollTop = 0;
   });
 }
 
